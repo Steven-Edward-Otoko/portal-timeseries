@@ -1,0 +1,307 @@
+---
+title: "APPLIED STOCHASTIC PROCESS PROJECT"
+author: "Otoko Steven Edward"
+date: "2024-02-04"
+output: html_document
+---
+
+```{r}
+library(forecast)
+library(tseries) 
+library(ggplot2)
+library(xts)
+library(zoo)
+data = read.csv("portal_timeseries.csv")
+data$date = as.Date(data$date, format = "%m/%d/%Y")
+NDVI_ts = ts(data$NDVI, start = c(1992, 3),
+             end = c(2014, 11), frequency = 12)
+
+# Calculate summary statistics for each column
+summary_table <- sapply(data[, c("NDVI", "rain", "rodents")], function(x) {
+  c(
+    "count" = length(x),
+    "mean" = mean(x, na.rm = TRUE),
+    "std" = sd(x, na.rm = TRUE),
+    "min" = min(x, na.rm = TRUE),
+    "25th percentile" = quantile(x, 0.25, na.rm = TRUE),
+    "median" = median(x, na.rm = TRUE),
+    "75th percentile" = quantile(x, 0.75, na.rm = TRUE),
+    "max" = max(x, na.rm = TRUE)
+  )
+})
+
+# Convert the summary to a data frame for a better tabular format
+summary_df <- as.data.frame(t(summary_table))
+
+# Print the summary table
+print(summary_df)
+
+```
+
+
+```{r}
+head(data)
+```
+
+
+
+
+#exploratory data anlysis
+```{r}
+# Plot the original NDVI time series data to visually assess its pattern, trends, and potential seasonality.
+plot(NDVI_ts)
+
+# Decompose the NDVI time series using Seasonal and Trend decomposition using Loess (STL). 
+# The 's.window = "periodic"' argument specifies that the seasonal component should be considered 
+# as repeating or periodic, which is appropriate for data with consistent seasonal patterns across years.
+stl_result <- stl(NDVI_ts, s.window = "periodic")
+
+# Plot the results of the STL decomposition to visually inspect the separated seasonal, trend, and 
+# remainder components of the NDVI time series. This decomposition helps in understanding the underlying 
+# patterns and assessing whether the data's variations are primarily due to trend, seasonality, or irregular fluctuations.
+plot(stl_result)
+
+```
+#checking for stationarity
+
+```{r}
+# Conduct an Augmented Dickey-Fuller (ADF) test on the NDVI time series to check for stationarity.
+# The 'alternative = "stationary"' option specifies that the hypothesis being tested is that the
+# time series is stationary.
+adf_test <- adf.test(NDVI_ts, alternative = "stationary")
+
+# Print the results of the ADF test, including the test statistic and p-value. These results are
+# crucial for determining if the NDVI time series has a unit root, indicating non-stationarity.
+print(adf_test)
+
+# Create a line plot of the NDVI time series data using ggplot2. This visualization aids in understanding
+# the data's temporal dynamics and the context of the ADF test results.
+ggplot(data = as.data.frame(NDVI_ts), aes(x = index(NDVI_ts), y = coredata(NDVI_ts))) +
+  geom_line() +
+  labs(title = "NDVI Time Series with ADF Test Result",
+       x = "Time",
+       y = "NDVI") +
+  # Annotate the plot with the ADF test statistic and p-value to provide a quick reference on the plot itself.
+  # The annotation is placed at the top right corner of the plot (Inf, Inf) with slight adjustments for visibility.
+  annotate("text", x = Inf, y = Inf, label = sprintf("ADF Test Statistic: %.2f, p-value: %.3f", adf_test$statistic, adf_test$p.value),
+           hjust = 1.1, vjust = 1.1, size = 5)
+
+
+```
+
+#AUTOCORRELATION To FIGURE OUT THE STRUCTURE IN THE DATASET
+#i WILL NEED TO EXPLAIN FEW THINGS AND OBERSvATION ON THE DATASET IN my REPORT
+```{r}
+acf(NDVI_ts)# to see the acf plot of the dataset
+pacf(NDVI_ts)#to see the pacf plot of the dataset
+```
+#FITTING A SIMPLE dummy ARIMA MODEL TO EXPLORE THE DATASET
+# Fit a basic ARIMA model to the NDVI time series data with no autoregressive (AR) terms,
+# no differencing (I), and no moving average (MA) terms. This is essentially a model
+# that assumes the data is white noise, with no trend or seasonality to model.
+```{r}
+avg_model = arima(NDVI_ts,c(0,0,0))
+```
+
+
+#looking at the structure of the average model
+# Use the str() function to display the structure of the ARIMA model object. This will show
+# details such as coefficients, standard errors, residuals, and other relevant model information.
+```{r}
+str(avg_model)
+```
+#making a dummy forecast
+#forecasting a basic ARIMA model to the NDVI time series data with no autoregressive (AR) terms,
+# no differencing (I), and no moving average (MA) terms. This is essentially a model
+# that assumes the data is white noise, with no trend or seasonality to model.
+```{r}
+avg_forecast = forecast(avg_model)
+str(avg_forecast)
+```
+#seeing the mean from our dummy average forecast(by default we have two forecasting seasons since our freuency is 24=12x2)
+# Extract and display the 'mean' component of the forecast object 'avg_forecast'. This component
+# represents the forecasted values of NDVI for future time points as predicted by the ARIMA model.
+avg_forecast$mean
+```{r}
+avg_forecast$mean
+```
+# Generate forecasts from the 'avg_model' (ARIMA model) for the next 48 time points (months) 
+# beyond the end of the NDVI_ts time series. This will produce a forecast for four years ahead, 
+# assuming the time series data is monthly (12 months * 4 years = 48 months). Confidence levels 
+# for the forecast intervals are set at 50% and 95%, providing a range within which future values 
+# are expected to fall with a certain probability.
+```{r}
+# Generate forecasts from the 'avg_model' (previously fitted model) for the next 48 months (4 years),
+# with prediction intervals set at 50% and 95% confidence levels. This anticipates future values
+# based on the model over a specified period, providing insights into expected trends and variability.
+avg_forecast = forecast(avg_model, 48, level = c(50, 95))
+
+# Display the structure of the 'avg_forecast' object to examine its components, including the forecasted
+# values, confidence intervals, and other pertinent information that aids in understanding the forecast's
+# specifics and underlying assumptions.
+str(avg_forecast)
+
+```
+#extracting the mean alone from the four years forecast
+```{r}
+avg_forecast$mean #to extract the mean alone
+plot(avg_forecast)
+checkresiduals(avg_forecast)
+
+
+```
+#creating and fitting and ARIMA MODEL non seasonal
+# Fit an ARIMA model to the NDVI time series data using the 'auto.arima' function, which
+# automatically selects the best fit ARIMA model based on AICc. The 'seasonal' argument is set
+# to FALSE to prevent the function from including seasonal components in the model.
+```{r}
+
+# Fit a non-seasonal ARIMA model to the NDVI time series, specifying that seasonal components should not be considered.
+arima_model = auto.arima(NDVI_ts, seasonal = FALSE)
+
+# Forecast future values of the NDVI time series using the fitted ARIMA model.
+arima_forecast = forecast(arima_model)
+
+# Plot the forecast, including both the historical NDVI data and the predicted values with confidence intervals.
+plot(arima_forecast)
+
+# Display the structure of the forecast object to review detailed components including forecasts and confidence intervals.
+str(arima_forecast)
+
+# Provide a summary of the forecast, offering insights into the model used and the forecast accuracy measures.
+summary(arima_forecast)
+
+# Extract and display the mean forecasted values, representing the central predictions for future NDVI values.
+arima_forecast$mean
+
+# Perform diagnostic checks on the forecast's residuals to assess the model's fit and the randomness of residuals.
+checkresiduals(arima_forecast)
+
+```
+#seasosnal forecasting
+# Fit a seasonal ARIMA model to the NDVI time series data using the 'auto.arima' function. 
+# This function will automatically select the best fitting ARIMA model that may include 
+# both non-seasonal and seasonal terms.
+```{r}
+seasonal_arima_model = auto.arima(NDVI_ts)
+# Generate a forecast from the fitted seasonal ARIMA model for 36 time points into the future. 
+# The 'h' parameter specifies the number of periods for forecasting, which is set to 36. 
+# Confidence intervals for the forecast are set at 80% and 99%, providing a range within which 
+# future values are expected to fall with corresponding probabilities.
+seasonal_arima_forecast = forecast(seasonal_arima_model, h=36, level = c(80,99))
+# Plot the forecast, which will include the historical NDVI data, the forecasted values, 
+# and the 80% and 99% prediction intervals.
+plot(seasonal_arima_forecast)
+checkresiduals(seasonal_arima_forecast)
+# Provide a summary of the forecast object. This will include details of the fitted model, 
+# the forecasted values, and statistical measures of accuracy such as the point forecasts, 
+# confidence intervals, and information criteria (AIC, BIC)
+summary(seasonal_arima_forecast)
+# Extract and display the mean forecast values from the 'seasonal_arima_forecast'. 
+# These represent the model's predicted NDVI values for future time points.
+seasonal_arima_forecast$mean
+```
+#method of simple exponential
+```{r}
+# Load the 'forecast' package which contains functions for time series forecasting.
+library(forecast)
+
+# Load the 'zoo' package which provides functions for working with indexed totally ordered observations.
+library(zoo)
+
+# Read the time series data from a CSV file named 'portal_timeseries.csv'.
+data = read.csv("portal_timeseries.csv")
+
+# Convert the 'date' column to Date objects, assuming dates are formatted as 'month/day/year'.
+data$date = as.Date(data$date, format = "%m/%d/%Y")
+
+# Create a time series object from the NDVI column in the data, with a specified start time, end time,
+# and frequency indicating monthly data (12 months per year).
+NDVI_ts = ts(data$NDVI, start = c(1992, 3), end = c(2014, 11), frequency = 12)
+
+# Apply Simple Exponential Smoothing (SES) to the NDVI time series to create a smoothed version of the series.
+avg_ses = ses(NDVI_ts)
+
+# Plot the smoothed time series object. This will show both the original data and the smoothed data.
+plot(avg_ses)
+
+# Perform diagnostic checks on the residuals of the SES model to ensure that the model has captured the
+# information in the data adequately. The checks include plotting the residuals and the ACF of the residuals,
+# as well as performing a Ljung-Box test to check for autocorrelation.
+checkresiduals(avg_ses)
+
+```
+```{r}
+avg_forecast_ses = forecast(avg_ses)
+avg_forecast_ses$mean
+```
+
+
+
+
+
+
+
+#Moving average
+```{r}
+# Calculate the moving average of the NDVI time series with an order of 10. The 'order' parameter
+# specifies the number of consecutive observations to be used in calculating the moving average.
+# The 'centre' parameter set to TRUE implies that the moving average is centered on the time series.
+moving_average = ma(NDVI_ts, order = 10, centre = TRUE)
+
+# Plot the original NDVI time series data with a line graph ('type = "l"'). The plot will have
+# the title "Time Series with Moving Average", and the axis labels "Value" for y-axis and "Time" for x-axis.
+plot(NDVI_ts, type = "l", main = "Time Series with Moving Average", ylab = "Value", xlab = "Time")
+
+# Overlay the moving average on the same plot as the original time series data. The moving average
+# is displayed in red ('col = "red"') and with a line width of 3 ('lwd = 3').
+lines(moving_average, col = "red", lwd = 3)
+
+```
+#sarima
+#fiting sarima model
+
+```{r}
+# Create a time series object 'NDVI_ts' using the 'date' column from the 'data' dataframe.
+# This line seems to have a mistake since it's creating a time series from dates instead of NDVI values.
+# Typically, you'd use NDVI values for analysis. The correct approach should involve NDVI data with a
+# specified frequency of 12 to indicate monthly data.
+NDVI_ts = ts(data$date, frequency = 12)
+
+# Fit a seasonal ARIMA model to the 'NDVI_ts' time series using the 'auto.arima' function. This function
+# automatically determines the best ARIMA model parameters (p, d, q) and seasonal parameters (P, D, Q) based
+# on AICc. However, the input to 'auto.arima' should be the NDVI values rather than dates.
+sarima <- auto.arima(NDVI_ts)
+
+# Provide a summary of the fitted seasonal ARIMA model. This includes details about the selected model order,
+# coefficients, statistical significance of the coefficients, and the information criteria (AIC, BIC) which
+# help in understanding the model's fit.
+summary(sarima)
+
+# Perform diagnostic checks on the residuals of the seasonal ARIMA model. This includes plotting the residuals,
+# the ACF of the residuals, performing a Ljung-Box test, and more to assess the adequacy of the model fit. The
+# diagnostics help in identifying any autocorrelation in residuals suggesting that the model may not have fully
+# captured the underlying data generation process.
+checkresiduals(sarima)
+
+
+```
+```{r}
+avg_forecast_sarima = forecast(sarima)
+avg_forecast_sarima$mean
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
