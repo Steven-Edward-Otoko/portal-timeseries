@@ -1,8 +1,5 @@
 ---
-title: "APPLIED STOCHASTIC PROCESS PROJECT"
-author: "Otoko Steven Edward"
-date: "2024-02-04"
-output: html_document
+title: "TIME SERIES ANALYSIS ON NDVI DATA"
 ---
 
 ```{r}
